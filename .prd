@@ -1,0 +1,406 @@
+📄 Product Requirements Document (PRD)
+Project Name
+
+High-Throughput Event Ingestion & Analytics Platform
+
+1. Overview
+   1.1 Problem Statement
+
+Modern applications generate a large volume of user interaction and system events (page views, clicks, lifecycle events).
+Handling these events synchronously causes:
+
+Increased API latency
+
+Database overload
+
+Poor scalability under traffic spikes
+
+There is a need for a high-throughput, low-latency ingestion system that decouples event intake from processing and provides near real-time aggregated analytics.
+
+1.2 Goal
+
+Build a scalable event ingestion and aggregation platform that:
+
+Accepts events at very high rates
+
+Keeps ingestion latency consistently low
+
+Processes and aggregates data asynchronously
+
+Exposes aggregated data via read-optimized APIs
+
+Visualizes system health and analytics via a lightweight dashboard
+
+1.3 Non-Goals
+
+This project does not aim to:
+
+Provide millisecond-accurate real-time analytics
+
+Guarantee exactly-once event delivery
+
+Support global, multi-region replication
+
+Replace production analytics products (GA, Mixpanel)
+
+2. Target Users
+   Primary Users
+
+Backend / Platform Engineers
+
+Engineering teams generating telemetry or analytics events
+
+Secondary Users
+
+Engineering Managers
+
+Developers validating system performance and correctness
+
+3. Event Context & Input Model
+   3.1 Context
+
+Events represent observability and analytics signals, not business transactions.
+
+Event sources may include:
+
+Web applications
+
+Mobile apps
+
+Backend services
+
+Internal systems
+
+Events are:
+
+Append-only
+
+High volume
+
+Loss-tolerant (within reason)
+
+Not directly tied to business correctness
+
+3.2 Event Types (Examples)
+Category Examples
+User Interaction page_view, button_click
+Funnel Events checkout_started, signup_started
+System Events job_failed, email_sent
+
+Event types are controlled values, not free text.
+
+3.3 Event Data Model
+
+Each event must contain:
+
+Field Type Description
+eventType string Type of event
+timestamp number Client-side epoch timestamp (ms)
+source string Origin (web, mobile, backend)
+entityId string (optional) User or session identifier
+context object (optional) Lightweight metadata
+Example Payload
+{
+"eventType": "page_view",
+"timestamp": 1736947200000,
+"source": "web",
+"entityId": "user_123",
+"context": {
+"page": "/pricing",
+"referrer": "/home"
+}
+}
+
+4. Functional Requirements (Backend)
+   4.1 Event Ingestion API
+
+Endpoint
+
+POST /events
+
+Requirements
+
+Validate basic schema only
+
+Enqueue event for async processing
+
+Respond immediately
+
+Must not access database synchronously
+
+Constraints
+
+Ingestion path must remain lightweight
+
+Target p95 latency < 20ms
+
+4.2 Asynchronous Processing
+
+Requirements
+
+Events must be processed via background workers
+
+Workers consume events in batches
+
+Processing must be retryable and fault-tolerant
+
+Responsibilities
+
+Group events by type and time bucket
+
+Increment counters in fast storage
+
+Avoid per-event DB writes
+
+4.3 Aggregation Strategy
+
+Time Buckets
+
+Per minute
+
+Per hour
+
+Per day
+
+Aggregation Dimensions
+
+eventType
+
+time bucket
+
+source (optional)
+
+Aggregation is eventually consistent, not real-time.
+
+4.4 Durable Storage
+
+Requirements
+
+Aggregated data is persisted in PostgreSQL
+
+Writes are batched
+
+Schema optimized for read-heavy workloads
+
+No raw event storage required for MVP
+
+4.5 Analytics Read APIs
+
+Expose read-only endpoints for aggregated data.
+
+Examples
+
+GET /analytics/events?eventType=page_view&period=hour
+GET /analytics/events?period=day
+
+Constraints
+
+Predictable query shapes
+
+Indexed access only
+
+No heavy computation at request time
+
+5. Load Simulation & Testing
+   5.1 Load Generator
+
+A dedicated load generator will:
+
+Simulate realistic event distributions
+
+Generate configurable event rates
+
+Mimic burst and sustained traffic
+
+Measure request latency and success rate
+
+5.2 Traffic Characteristics
+
+Skewed distribution (hot events)
+
+Burst traffic patterns
+
+Sustained high throughput
+
+6. Frontend Requirements (Dashboard)
+   6.1 Frontend Purpose
+
+The frontend serves as an observability dashboard, not a user-facing product.
+
+It exists to:
+
+Visualize system behavior under load
+
+Validate aggregation correctness
+
+Demonstrate scalability and performance characteristics
+
+6.2 Frontend Scope
+Explicitly Included
+
+Read-only dashboards
+
+Polling-based data refresh
+
+System health visualization
+
+Explicitly Excluded
+
+Authentication
+
+Real-time streaming via WebSockets
+
+User-level analytics
+
+Complex UI interactions
+
+6.3 Dashboard Pages
+Page 1: System Overview
+
+Purpose
+Show system health and ingestion performance.
+
+Metrics Displayed
+
+Events ingested per second
+
+Queue depth
+
+Worker processing rate
+
+Aggregation lag (seconds)
+
+Page 2: Event Analytics
+
+Purpose
+Show correctness of aggregated data.
+
+Data Displayed
+
+Event counts by type
+
+Time-series graphs (minute / hour)
+
+Source breakdown
+
+Data refreshes via polling (5–10s interval).
+
+Page 3: Load Control (Optional)
+
+Purpose
+Control and observe load tests.
+
+Controls
+
+Start / stop load generator
+
+Events per second
+
+Event distribution ratios
+
+6.4 Frontend Tech Constraints
+
+Built with Next.js + Tailwind
+
+Uses read-only APIs
+
+Polling over push mechanisms
+
+Minimal client-side state
+
+7. Non-Functional Requirements
+   7.1 Performance Targets
+   Metric Target
+   Sustained throughput 5,000–10,000 events/sec
+   Ingestion p95 latency < 20 ms
+   Aggregation delay ≤ 60 seconds
+   7.2 Scalability
+
+Horizontal worker scaling supported
+
+Read and write paths decoupled
+
+No code changes required to increase throughput
+
+7.3 Reliability & Fault Tolerance
+
+Ingestion remains available if workers or DB slow down
+
+Queue retries for transient failures
+
+At-least-once processing semantics acceptable
+
+7.4 Observability
+
+The system must expose:
+
+Ingestion rate
+
+Queue backlog
+
+Worker lag
+
+Aggregation delay
+
+Error rates
+
+8. Success Criteria (Definition of Done)
+
+The project is considered complete when:
+
+Sustains 5k–10k events/sec on a single node
+
+Ingestion latency stays below 20ms p95
+
+Aggregated data is eventually correct
+
+System remains stable under sustained load
+
+Bottlenecks and limits are documented clearly
+
+9. Risks & Trade-offs
+   Area Decision Trade-off
+   Consistency Eventual Faster ingestion
+   Delivery At-least-once Possible duplicates
+   Real-time Near real-time Higher throughput
+   Storage Aggregates only Less raw data
+
+10. Key Takeaway
+
+This project prioritizes:
+Throughput over immediacy
+Stability over strict consistency
+Learning system behavior under load
+It is designed to demonstrate scalability, performance tuning, and async system design, not UI polish.
+
+Tech Stack :-
+- NestJS
+- PostgreSQL
+- Prisma
+- Redis
+- BullMQ
+
+Docker:
+ -> Containerized services:
+    - API
+    - Workers
+    - Redis
+    - PostgreSQL
+    - Load generator
+
+-> Docker Compose
+    - Local orchestration
+    - Easy spin-up / teardown
+    - Production-like environment
+
+-> Multi-stage Builds
+    - Optimized container sizes
+    - Faster startup
+    - Cleaner images
+
+Programming Language
+TypeScript (Everywhere)
+Frontend
+Backend
+Workers
+Load generator
