@@ -1,0 +1,21 @@
+{
+    "name": "event-worker",
+    "version": "1.0.0",
+
+    "scripts": {
+        "start": "ts-node event-processor.ts",
+        "dev": "nodemon --exec ts-node event-processor.ts"
+    },
+    "dependencies": {
+        "@prisma/client": "^6.0.0",
+        "bullmq": "^5.66.4",
+        "dotenv": "^17.2.3",
+        "prisma": "^6.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.7",
+        "nodemon": "^3.1.11",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.7.3"
+    }
+}
